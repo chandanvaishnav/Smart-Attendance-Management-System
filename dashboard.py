@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 from ML_models import train_and_evaluate_models
-from attendance_utils import load_attendance_data
+from attendance_utils import build_attendance_chart_data, load_attendance_data
 
 
 st.set_page_config(page_title="Smart Attendance Dashboard", page_icon="🎓", layout="wide")
@@ -11,6 +11,11 @@ st.set_page_config(page_title="Smart Attendance Dashboard", page_icon="🎓", la
 @st.cache_data
 def get_dataset() -> pd.DataFrame:
     return load_attendance_data()
+
+
+@st.cache_data
+def get_attendance_chart_data():
+    return build_attendance_chart_data(get_dataset())
 
 
 @st.cache_resource
@@ -107,40 +112,57 @@ if page == "Dashboard Overview":
 
 elif page == "Attendance Analysis":
     st.markdown('<div class="section-title">Attendance Overview</div>', unsafe_allow_html=True)
-
-    present_absent = pd.DataFrame(
-        {"Students": [int(df["Present"].sum()), int(df["Absent"].sum())]},
-        index=["Present", "Absent"],
-    )
+    average_counts, daily, monthly, weekday, schools = get_attendance_chart_data()
 
     col1, col2 = st.columns(2)
     with col1:
-        st.subheader("Present vs Absent")
-        st.bar_chart(present_absent)
+        st.subheader("Present vs Absent per School-Day")
+        st.bar_chart(
+            average_counts,
+            x="Attendance",
+            y="Average students per school-day",
+            x_label="Attendance",
+            y_label="Average students per school-day",
+        )
     with col2:
-        st.subheader("Attendance Percentage")
-        daily_rate = (df.groupby("Date")["Present"].sum() / df.groupby("Date")["Enrolled"].sum()) * 100
-        st.line_chart(daily_rate.rename("Attendance %"))
+        st.subheader("Attendance Percentage by Weekday")
+        st.bar_chart(
+            weekday,
+            x="Weekday",
+            y="Attendance Percentage",
+            x_label="Weekday",
+            y_label="Attendance percentage",
+        )
 
     st.write("")
     st.subheader("Attendance Trend Over Time")
-    daily = df.groupby("Date")["Present"].sum()
-    st.line_chart(daily)
-
-    st.write("")
-    st.subheader("Monthly Attendance")
-    monthly = df.assign(Month=df["Date"].dt.to_period("M").astype(str)).groupby("Month")["Present"].sum()
-    st.bar_chart(monthly)
-
-    st.write("")
-    st.subheader("Top Schools by Average Attendance")
-    school_summary = (
-        (df.groupby("School DBN")["Present"].sum() / df.groupby("School DBN")["Enrolled"].sum())
-        .sort_values(ascending=False)
-        .head(10)
+    st.line_chart(
+        daily,
+        x="Date",
+        y="Attendance Percentage",
+        x_label="Date",
+        y_label="Attendance percentage",
     )
-    school_summary.name = "Attendance %"
-    st.bar_chart(school_summary)
+
+    st.write("")
+    st.subheader("Monthly Attendance Rate")
+    st.bar_chart(
+        monthly,
+        x="Month",
+        y="Attendance Percentage",
+        x_label="Month",
+        y_label="Attendance percentage",
+    )
+
+    st.write("")
+    st.subheader("Top Schools by Attendance Rate")
+    st.bar_chart(
+        schools,
+        x="School DBN",
+        y="Attendance Percentage",
+        x_label="School DBN",
+        y_label="Attendance percentage",
+    )
 
 elif page == "Search Records":
     st.markdown('<div class="section-title">Search Records</div>', unsafe_allow_html=True)
@@ -158,7 +180,7 @@ elif page == "Model Comparison":
     st.markdown('<div class="section-title">Model Evaluation</div>', unsafe_allow_html=True)
     model_results, trained_models, X_test, y_test = get_model_registry_and_test_data()
     st.dataframe(model_results, width="stretch")
-    st.bar_chart(model_results.set_index("Model")["MAE"])
+    st.bar_chart(model_results, x="Model", y="MAE", x_label="Model", y_label="Test MAE")
     st.caption("Metrics use a chronological holdout and school/calendar predictors only. Same-day attendance counts are excluded.")
 
 elif page == "ML Prediction":
@@ -190,16 +212,26 @@ elif page == "ML Prediction":
 
 elif page == "Visualizations":
     st.markdown('<div class="section-title">Attendance Visualizations</div>', unsafe_allow_html=True)
-    daily_totals = df.groupby("Date")[["Present", "Absent"]].sum()
-    daily_enrolled = df.groupby("Date")["Enrolled"].sum()
-    daily_rate = (daily_totals["Present"] / daily_enrolled) * 100
+    _, daily, _, _, _ = get_attendance_chart_data()
     first, second = st.columns(2)
     with first:
-        st.subheader("Present and Absent by Day")
-        st.area_chart(daily_totals)
+        st.subheader("Average Present and Absent per School-Day")
+        st.line_chart(
+            daily,
+            x="Date",
+            y=["Average Present per School-Day", "Average Absent per School-Day"],
+            x_label="Date",
+            y_label="Average students per school-day",
+        )
     with second:
         st.subheader("Daily Attendance Rate")
-        st.line_chart(daily_rate.rename("Attendance %"))
+        st.line_chart(
+            daily,
+            x="Date",
+            y="Attendance Percentage",
+            x_label="Date",
+            y_label="Attendance percentage",
+        )
 
 elif page == "Dataset Explorer":
     st.markdown('<div class="section-title">Dataset Information</div>', unsafe_allow_html=True)

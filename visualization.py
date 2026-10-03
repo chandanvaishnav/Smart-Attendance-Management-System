@@ -7,7 +7,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from attendance_utils import get_project_root, load_attendance_data
+from attendance_utils import build_attendance_chart_data, get_project_root, load_attendance_data
 
 
 def save_chart(fig: plt.Figure, filename: str) -> None:
@@ -20,48 +20,43 @@ def save_chart(fig: plt.Figure, filename: str) -> None:
 
 def main() -> None:
     df = load_attendance_data()
-
-    total_present = int(df["Present"].sum())
-    total_absent = int(df["Absent"].sum())
+    average_counts, daily, monthly, _, schools = build_attendance_chart_data(df)
 
     fig1, ax1 = plt.subplots(figsize=(8, 5))
-    ax1.bar(["Present", "Absent"], [total_present, total_absent], color=["#22d3ee", "#8b5cf6"])
-    ax1.set_title("Total Present vs Absent Students")
+    ax1.bar(
+        average_counts["Attendance"],
+        average_counts["Average students per school-day"],
+        color=["#22d3ee", "#8b5cf6"],
+    )
+    ax1.set_title("Average Present vs Absent per School-Day")
     ax1.set_xlabel("Attendance Status")
-    ax1.set_ylabel("Number of Students")
+    ax1.set_ylabel("Average students per school-day")
     save_chart(fig1, "attendance_distribution.png")
 
-    daily_data = df.groupby("Date")["Present"].sum()
     fig2, ax2 = plt.subplots(figsize=(12, 6))
-    ax2.plot(daily_data.index, daily_data.values, color="#22d3ee", linewidth=2)
-    ax2.set_title("Daily Attendance Trend")
+    ax2.plot(daily["Date"], daily["Attendance Percentage"], color="#22d3ee", linewidth=2)
+    ax2.set_ylim(0, 100)
+    ax2.set_title("Daily Attendance Rate")
     ax2.set_xlabel("Date")
-    ax2.set_ylabel("Total Present Students")
+    ax2.set_ylabel("Attendance percentage")
     ax2.tick_params(axis="x", rotation=45)
     save_chart(fig2, "attendance_trend.png")
 
-    top_schools = (
-        df.groupby("School DBN")["Present"]
-        .mean()
-        .sort_values(ascending=False)
-        .head(10)
-    )
     fig3, ax3 = plt.subplots(figsize=(12, 6))
-    ax3.bar(top_schools.index, top_schools.values, color="#8b5cf6")
-    ax3.set_title("Top 10 Schools by Average Attendance")
+    ax3.bar(schools["School DBN"], schools["Attendance Percentage"], color="#8b5cf6")
+    ax3.set_ylim(0, 100)
+    ax3.set_title("Top 10 Schools by Attendance Rate")
     ax3.set_xlabel("School DBN")
-    ax3.set_ylabel("Average Present Students")
+    ax3.set_ylabel("Attendance percentage")
     ax3.tick_params(axis="x", rotation=45)
     save_chart(fig3, "school_attendance.png")
 
-    daily_totals = df.groupby("Date")[["Present", "Absent"]].sum()
-    daily_enrolled = df.groupby("Date")["Enrolled"].sum()
-    daily_rate = daily_totals["Present"] / daily_enrolled * 100
     fig4, ax4 = plt.subplots(figsize=(12, 6))
-    ax4.plot(daily_rate.index, daily_rate.values, color="#8b5cf6", linewidth=2)
-    ax4.set_title("Daily Attendance Percentage")
-    ax4.set_xlabel("Date")
-    ax4.set_ylabel("Attendance Percentage")
+    ax4.bar(monthly["Month"], monthly["Attendance Percentage"], color="#8b5cf6")
+    ax4.set_ylim(0, 100)
+    ax4.set_title("Monthly Attendance Rate")
+    ax4.set_xlabel("Month")
+    ax4.set_ylabel("Attendance percentage")
     ax4.tick_params(axis="x", rotation=45)
     save_chart(fig4, "attendance_percentage.png")
 

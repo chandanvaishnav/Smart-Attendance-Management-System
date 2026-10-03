@@ -83,11 +83,13 @@ All same-day attendance counts (`Enrolled`, `Absent`, and `Released`) are exclud
 The dashboard includes:
 
 - Dashboard overview cards
-- Attendance and absence charts, daily/monthly trends, and school summaries
+- Average present/absent counts per school-day, weighted daily/monthly attendance rates, weekday rates, and top-school rates
 - Search by school and date
 - Model comparison table and MAE chart
 - School/date attendance prediction
 - Filterable dataset explorer and summary
+
+Chart rates are calculated from grouped sums (`Present / Enrolled * 100`). Count comparisons use the average per school-day rather than summing every row into totals of more than 150 million. The original attendance totals remain available in the overview KPIs.
 
 ## 9. Project Structure
 

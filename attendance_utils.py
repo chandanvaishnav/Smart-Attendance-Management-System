@@ -69,6 +69,43 @@ def load_attendance_data() -> pd.DataFrame:
     return df.reset_index(drop=True)
 
 
+def build_attendance_chart_data(
+    df: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    average_counts = (
+        df[["Present", "Absent"]]
+        .mean()
+        .rename_axis("Attendance")
+        .reset_index(name="Average students per school-day")
+    )
+
+    count_columns = ["Present", "Absent", "Enrolled"]
+    daily = df.groupby("Date")[count_columns].sum().sort_index()
+    daily["School-Day Records"] = df.groupby("Date").size()
+    daily["Attendance Percentage"] = daily["Present"].div(daily["Enrolled"]) * 100
+    daily["Average Present per School-Day"] = daily["Present"].div(daily["School-Day Records"])
+    daily["Average Absent per School-Day"] = daily["Absent"].div(daily["School-Day Records"])
+    daily = daily.reset_index()
+
+    monthly = (
+        df.assign(Month=df["Date"].dt.to_period("M").astype(str))
+        .groupby("Month", as_index=False)[count_columns]
+        .sum()
+    )
+    monthly["Attendance Percentage"] = monthly["Present"].div(monthly["Enrolled"]) * 100
+
+    weekday_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    weekday = df.assign(Weekday=df["Date"].dt.day_name()).groupby("Weekday")[count_columns].sum()
+    weekday["Attendance Percentage"] = weekday["Present"].div(weekday["Enrolled"]) * 100
+    weekday = weekday.reindex(weekday_order).dropna(subset=["Present"]).reset_index()
+
+    schools = df.groupby("School DBN")[count_columns].sum()
+    schools["Attendance Percentage"] = schools["Present"].div(schools["Enrolled"]) * 100
+    schools = schools.sort_values("Attendance Percentage", ascending=False).head(10).reset_index()
+
+    return average_counts, daily, monthly, weekday, schools
+
+
 def build_prediction_features(
     df: pd.DataFrame,
     school_codes: dict[str, int] | None = None,

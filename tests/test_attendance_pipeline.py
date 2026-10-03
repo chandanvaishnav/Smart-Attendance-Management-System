@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import ams
 import attendance_utils
-from attendance_utils import build_prediction_features, load_attendance_data
+from attendance_utils import build_attendance_chart_data, build_prediction_features, load_attendance_data
 
 
 class AttendancePipelineTests(unittest.TestCase):
@@ -35,6 +35,29 @@ class AttendancePipelineTests(unittest.TestCase):
         self.assertNotIn("Released", features.columns)
         self.assertEqual(len(features), len(target))
         self.assertTrue((df["Present"] + df["Absent"] + df["Released"] == df["Enrolled"]).all())
+
+    def test_chart_aggregations_are_realistic_and_conserve_totals(self):
+        df = load_attendance_data()
+        average_counts, daily, monthly, weekdays, schools = build_attendance_chart_data(df)
+
+        average_by_status = average_counts.set_index("Attendance")["Average students per school-day"]
+        self.assertAlmostEqual(average_by_status["Present"], df["Present"].mean(), places=6)
+        self.assertAlmostEqual(average_by_status["Absent"], df["Absent"].mean(), places=6)
+        self.assertLess(average_counts["Average students per school-day"].max(), 600)
+
+        for grouped in (daily, monthly):
+            self.assertEqual(int(grouped["Present"].sum()), int(df["Present"].sum()))
+            self.assertEqual(int(grouped["Absent"].sum()), int(df["Absent"].sum()))
+            self.assertTrue(grouped["Attendance Percentage"].between(0, 100).all())
+
+        self.assertEqual(len(monthly), 10)
+        self.assertEqual(monthly["Month"].tolist(), sorted(monthly["Month"].tolist()))
+        self.assertEqual(daily["Date"].min().strftime("%Y-%m-%d"), "2018-09-04")
+        self.assertEqual(daily["Date"].max().strftime("%Y-%m-%d"), "2019-06-26")
+        self.assertTrue(weekdays["Attendance Percentage"].between(0, 100).all())
+        self.assertEqual(len(schools), 10)
+        self.assertTrue(schools["Attendance Percentage"].between(0, 100).all())
+        self.assertTrue((average_counts["Average students per school-day"] >= 0).all())
 
     def test_invalid_required_values_are_not_silently_removed(self):
         with tempfile.TemporaryDirectory() as directory:
